@@ -28,8 +28,8 @@ Red Hat Enterprise Skills Server — self-hosted AI agent skills directory.
    - **Required for merge:** GitHub Actions `Build, Lint & Test` + container image build, and Prow `ci/prow/images`.
    - **Recommended to watch, but not merge-blocking:** `ci/prow/rhess-e2e` is `optional: true` (deploys to a live OpenShift cluster and can take a long time) — treat it as a smoke test, not a gate.
    - When polling via `gh pr view --json statusCheckRollup`, note GitHub Actions entries are `CheckRun`s (`status`/`conclusion` fields) while Prow entries are `StatusContext`s (`state` field only) — a query that only checks `conclusion`/`status` will silently miss Prow results.
-4. Wait for the Qodo automated review to post. Treat each finding on its merits — fix real bugs, but don't blindly apply suggestions that don't hold up.
-5. Push fixes (amend if the PR is a single logical commit and hasn't been reviewed by a human yet; otherwise add a new commit) and re-verify CI + tests.
+4. Wait for the Qodo automated review to post — it auto-triggers on PR open, no manual step needed. Treat each finding on its merits — fix real bugs, but don't blindly apply suggestions that don't hold up.
+5. Push fixes (amend if the PR is a single logical commit and hasn't been reviewed by a human yet; otherwise add a new commit) and re-verify CI + tests. This repo has no `.pr_agent.toml`, so Qodo's `handle_push_trigger` default (`false`) applies — it will **not** auto-re-review on subsequent pushes, including amends/force-pushes. Comment `/agentic_review` (not the deprecated `/review`) to manually request the re-review.
 6. Confirm Qodo has no further unresolved findings and required checks are green, then merge (squash) and delete the branch.
 
 ## Architecture
