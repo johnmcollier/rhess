@@ -1,7 +1,7 @@
 {
   "name": "rhess",
   "version": "0.1.0",
-  "description": "Red Hat Enterprise Skills Server — self-hosted AI agent skills directory",
+  "description": "RHESS - Enterprise Skills Server — self-hosted AI agent skills directory",
   "license": "Apache-2.0",
   "private": true,
   "type": "module",

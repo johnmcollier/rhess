@@ -1,6 +1,6 @@
 # rhess
 
-Red Hat Enterprise Skills Server — self-hosted AI agent skills directory.
+RHESS - Enterprise Skills Server — self-hosted AI agent skills directory.
 
 ## Build & Test Commands
 
