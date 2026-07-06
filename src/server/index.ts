@@ -82,7 +82,7 @@ export async function buildServer(repos?: Repositories) {
   await app.register(fastifySwagger, {
     openapi: {
       info: {
-        title: "RHESS — Red Hat Enterprise Skills Server",
+        title: "RHESS - Enterprise Skills Server",
         description:
           "Self-hosted AI agent skills directory. " +
           "Skills Catalog and Discovery endpoints are unauthenticated. " +

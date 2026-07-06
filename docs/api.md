@@ -1,6 +1,6 @@
 # RHESS API Reference
 
-Red Hat Enterprise Skills Server — REST API.
+RHESS - Enterprise Skills Server — REST API.
 
 Interactive docs are available at **`/documentation`** when the server is running (Swagger UI, backed by the OpenAPI spec at `/documentation/json`).
 

@@ -1,7 +1,7 @@
 schema: rhdh-spec-driven
 
 context: |
-  Project: Red Hat Enterprise Skills Server (RHESS)
+  Project: RHESS - Enterprise Skills Server
   Repository: github.com/redhat-ai-dev/rhess
   Tech stack: Node.js, TypeScript, Fastify, React, PatternFly, SQLite, Vite
   License: Apache-2.0

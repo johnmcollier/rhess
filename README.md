@@ -1,4 +1,4 @@
-# Red Hat Enterprise Skills Server (RHESS)
+# RHESS - Enterprise Skills Server
 
 > **Developer Preview** — not yet ready for production use.
 
