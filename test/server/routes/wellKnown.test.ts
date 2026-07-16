@@ -116,6 +116,61 @@ describe("GET /.well-known/agent-skills/index.json", () => {
     expect(react.name).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
   });
 
+  it("omits skills whose slug is not a valid CLI install id", async () => {
+    const db = new BetterSqlite3(":memory:");
+    db.pragma("foreign_keys = ON");
+    runMigrations(db);
+    const sources = new SqliteSourceRepository(db);
+    const skills = new SqliteSkillRepository(db);
+    const src = sources.create({ slug: "team-a", label: "team-a", url: "https://example.com/repo" });
+    skills.upsertMany([
+      {
+        sourceId: src.id,
+        sourceSlug: "team-a",
+        slug: "valid-skill",
+        name: "Valid Skill",
+        description: "ok",
+        artifactType: "skill-md",
+        digest: "abc123",
+        content: "# Valid\n",
+        supportingFiles: [],
+        allowedTools: [],
+        skillPath: "skills/valid-skill/SKILL.md",
+        category: null,
+        frontmatter: {},
+      },
+      {
+        sourceId: src.id,
+        sourceSlug: "team-a",
+        slug: "Bad Name",
+        name: "Bad Name",
+        description: "invalid",
+        artifactType: "skill-md",
+        digest: "def456",
+        content: "# Bad\n",
+        supportingFiles: [],
+        allowedTools: [],
+        skillPath: "skills/Bad Name/SKILL.md",
+        category: null,
+        frontmatter: {},
+      },
+    ]);
+    const localApp = Fastify({ logger: false });
+    await localApp.register(wellKnownPlugin, { prefix: "/.well-known", skills });
+    await localApp.ready();
+    try {
+      const res = await localApp.inject({
+        method: "GET",
+        url: "/.well-known/agent-skills/index.json",
+      });
+      const { skills: entries } = res.json();
+      expect(entries).toHaveLength(1);
+      expect(entries[0].name).toBe("valid-skill");
+    } finally {
+      await localApp.close();
+    }
+  });
+
   it("truncates discovery descriptions longer than 1024 characters", async () => {
     const db = new BetterSqlite3(":memory:");
     db.pragma("foreign_keys = ON");
@@ -291,6 +346,20 @@ describe("GET /.well-known/agent-skills/index.json — PUBLIC_BASE_URL", () => {
     const { skills } = res.json();
     for (const s of skills) {
       expect(s.url).toContain("localhost:4000");
+    }
+  });
+
+  it("does not reflect spoofed Host headers into artifact URLs", async () => {
+    delete process.env["PUBLIC_BASE_URL"];
+    const res = await app.inject({
+      method: "GET",
+      url: "/.well-known/agent-skills/index.json",
+      headers: { host: "evil.example.com@attacker.test" },
+    });
+    const { skills } = res.json();
+    for (const s of skills) {
+      expect(s.url).not.toContain("attacker.test");
+      expect(s.url).toMatch(/^https?:\/\/localhost\//);
     }
   });
 });

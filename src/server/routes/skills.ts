@@ -8,6 +8,7 @@ import type { SearchProvider } from "../search/types.js";
 import type { Repositories } from "../db/init.js";
 import { createAdminAuthHook } from "../plugins/adminAuth.js";
 import { ingestSource } from "../ingestion/ingest.js";
+import { resolveBaseUrl } from "../utils/resolveBaseUrl.js";
 
 /**
  * Decode a base64 tar.gz archive and return all contained files as
@@ -48,23 +49,12 @@ async function expandArchiveToFiles(
   }
 }
 
-/**
- * Derive the server's public base URL for constructing install commands.
- * Mirrors the logic in wellKnown.ts.
- */
-function resolveBaseUrl(req: FastifyRequest): string {
-  const configured = process.env["PUBLIC_BASE_URL"];
-  if (configured) return configured.replace(/\/+$/, "");
-  const raw = req.headers.host;
-  const host = (Array.isArray(raw) ? raw[0] : raw)?.trim() ?? req.hostname;
-  return `${req.protocol}://${host}`;
-}
-
 function skillToResponse(skill: Skill, source: Source | undefined, baseUrl: string) {
   // Point at the host so the CLI discovers via /.well-known/agent-skills/index.json,
   // then select this skill. Artifact URLs are not a valid skills-add source by themselves
   // and would make the CLI fetch every skill in the index.
-  const installCommand = `npx skills add ${baseUrl} --skill ${skill.slug}`;
+  // Use --skill=<id> (single argv token) so odd slug characters cannot split the command.
+  const installCommand = `npx skills add ${baseUrl} --skill=${skill.slug}`;
   return {
     id: skill.id,
     source: skill.sourceSlug,

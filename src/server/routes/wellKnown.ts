@@ -1,32 +1,10 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import type { SkillRepository } from "../db/types.js";
+import { resolveBaseUrl } from "../utils/resolveBaseUrl.js";
+import { isValidSkillInstallId } from "../utils/skillInstallId.js";
 
 interface WellKnownOptions {
   skills: SkillRepository;
-}
-
-/**
- * Derive the server's public base URL.
- *
- * Priority:
- *   1. PUBLIC_BASE_URL env var — the only trusted source for proxy deployments.
- *      Must be set when RHESS sits behind a reverse proxy.
- *   2. req.protocol + Host header — safe for direct (non-proxied) access.
- *      req.hostname strips the port, so we use req.headers.host (e.g.
- *      "localhost:3000") to preserve it. Do NOT read X-Forwarded-* headers
- *      directly; they are client-controlled without trustProxy configuration.
- */
-function resolveBaseUrl(req: FastifyRequest): string {
-  const configured = process.env["PUBLIC_BASE_URL"];
-  if (configured) return configured.replace(/\/+$/, "");
-  // Host header is an HTTP/1.1 request requirement and comes from the actual
-  // TCP connection in direct deployments — more trustworthy than X-Forwarded-*
-  // but must be normalized: take first value if somehow multi-valued, strip
-  // any surrounding whitespace, and fall back to req.hostname (port-less) only
-  // as a last resort.
-  const raw = req.headers.host;
-  const host = (Array.isArray(raw) ? raw[0] : raw)?.trim() ?? req.hostname;
-  return `${req.protocol}://${host}`;
 }
 
 const wellKnownPlugin: FastifyPluginAsync<WellKnownOptions> = async (fastify, opts) => {
@@ -69,18 +47,20 @@ const wellKnownPlugin: FastifyPluginAsync<WellKnownOptions> = async (fastify, op
       // Opaque schema URI required by the Agent Skills discovery RFC / npx skills CLI.
       // Clients match this exactly; a different v0.2.0-looking URI is rejected.
       $schema: "https://schemas.agentskills.io/discovery/0.2.0/schema.json",
-      skills: entries.map((s) => ({
-        // Discovery `name` must be a kebab-case install id ([a-z0-9-]+). Prefer slug
-        // over frontmatter display names that may contain spaces or mixed case.
-        name: s.slug,
-        type: s.artifactType,
-        // CLI rejects descriptions longer than 1024 characters.
-        description: s.description.length > 1024
-          ? `${s.description.slice(0, 1023)}…`
-          : s.description,
-        url: `${baseUrl}/api/v1/skills/${encodeURIComponent(s.sourceSlug)}/${encodeURIComponent(s.slug)}/artifact`,
-        digest: `sha256:${s.digest}`,
-      })),
+      skills: entries
+        .filter((s) => isValidSkillInstallId(s.slug))
+        .map((s) => ({
+          // Discovery `name` must be a kebab-case install id ([a-z0-9-]+). Prefer slug
+          // over frontmatter display names that may contain spaces or mixed case.
+          name: s.slug,
+          type: s.artifactType,
+          // CLI rejects descriptions longer than 1024 characters.
+          description: s.description.length > 1024
+            ? `${s.description.slice(0, 1023)}…`
+            : s.description,
+          url: `${baseUrl}/api/v1/skills/${encodeURIComponent(s.sourceSlug)}/${encodeURIComponent(s.slug)}/artifact`,
+          digest: `sha256:${s.digest}`,
+        })),
     });
   });
 };

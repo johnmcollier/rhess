@@ -103,8 +103,21 @@ describe("GET /api/v1/skills", () => {
     expect(res.statusCode).toBe(200);
     const skill = res.json().data.find((s: { slug: string }) => s.slug === "react-patterns");
     expect(skill.installCommand).toBe(
-      "npx skills add http://localhost:3000 --skill react-patterns",
+      "npx skills add http://localhost:3000 --skill=react-patterns",
     );
+  });
+
+  it("installCommand does not reflect spoofed Host headers", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/v1/skills",
+      headers: { host: "evil.example.com@attacker.test" },
+    });
+    expect(res.statusCode).toBe(200);
+    for (const skill of res.json().data) {
+      expect(skill.installCommand).not.toContain("attacker.test");
+      expect(skill.installCommand).toMatch(/^npx skills add http:\/\/localhost --skill=/);
+    }
   });
 
   it("paginates correctly", async () => {
