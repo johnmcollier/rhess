@@ -26,11 +26,24 @@ export function isSafeHostHeader(host: string | undefined): boolean {
       if (!Number.isInteger(port) || port < 1 || port > 65535) return false;
     }
 
-    // Ensure round-trip preserves the Host form we will embed (incl. [ipv6]:port).
-    const authority = parsed.host; // hostname[:port], brackets for IPv6
-    return authority === host;
+    // URL parsing lowercases DNS/IPv6; compare case-insensitively so valid Host
+    // values are not rejected solely due to canonicalization.
+    return parsed.host.toLowerCase() === host.toLowerCase();
   } catch {
     return false;
+  }
+}
+
+/**
+ * Return a canonical host authority for embedding in public URLs, or null if unsafe.
+ * Uses the URL parser's normalized form (lowercase DNS/IPv6, bracketed IPv6).
+ */
+export function canonicalizeHostHeader(host: string | undefined): string | null {
+  if (!isSafeHostHeader(host)) return null;
+  try {
+    return new URL(`http://${host}`).host;
+  } catch {
+    return null;
   }
 }
 
@@ -49,7 +62,7 @@ export function resolveBaseUrl(req: FastifyRequest): string {
 
   const raw = req.headers.host;
   const candidate = (Array.isArray(raw) ? raw[0] : raw)?.trim();
-  const host = isSafeHostHeader(candidate) ? candidate! : "localhost";
+  const host = canonicalizeHostHeader(candidate) ?? "localhost";
   const protocol = req.protocol === "https" ? "https" : "http";
   return `${protocol}://${host}`;
 }

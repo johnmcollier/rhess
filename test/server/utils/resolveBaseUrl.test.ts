@@ -10,6 +10,12 @@ describe("isSafeHostHeader", () => {
     expect(isSafeHostHeader("rhess.example.com:8443")).toBe(true);
   });
 
+  it("accepts mixed-case DNS hosts that URL parsing lowercases", () => {
+    expect(isSafeHostHeader("EXAMPLE.COM")).toBe(true);
+    expect(isSafeHostHeader("Example.COM:3000")).toBe(true);
+    expect(isSafeHostHeader("[2001:DB8::1]:8080")).toBe(true);
+  });
+
   it("accepts IPv4 with optional port", () => {
     expect(isSafeHostHeader("127.0.0.1")).toBe(true);
     expect(isSafeHostHeader("127.0.0.1:3000")).toBe(true);
@@ -59,6 +65,11 @@ describe("resolveBaseUrl", () => {
   it("preserves IPv6 Host literals", () => {
     delete process.env["PUBLIC_BASE_URL"];
     expect(resolveBaseUrl(fakeReq("[::1]:3000"))).toBe("http://[::1]:3000");
+  });
+
+  it("emits canonical lowercase DNS hosts", () => {
+    delete process.env["PUBLIC_BASE_URL"];
+    expect(resolveBaseUrl(fakeReq("Example.COM:3000"))).toBe("http://example.com:3000");
   });
 
   it("falls back to localhost for spoofed Host", () => {
