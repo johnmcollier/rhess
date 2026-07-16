@@ -2,17 +2,36 @@ import type { FastifyRequest } from "fastify";
 
 /**
  * Host header values safe to embed in public URLs / install commands.
- * Rejects credentials, paths, spaces, commas (multi-value), and other spoof markers.
- * Allows hostname, hostname:port, IPv4, and IPv4:port.
+ * Parses the value as an HTTP authority (via WHATWG URL) so hostname/IPv4/
+ * bracketed IPv6 (+ optional port) are accepted, while credentials, paths,
+ * queries, fragments, and other spoof markers are rejected.
  */
-const SAFE_HOST_RE =
-  /^(?:(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(?:\.(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?))*|localhost|\d{1,3}(?:\.\d{1,3}){3})(?::\d{1,5})?$/;
-
 export function isSafeHostHeader(host: string | undefined): boolean {
   if (!host) return false;
   if (host.length > 253) return false;
+  // Reject obvious spoof / multi-value markers before URL parsing.
   if (/[\s@\\/,]/.test(host)) return false;
-  return SAFE_HOST_RE.test(host);
+
+  try {
+    const parsed = new URL(`http://${host}`);
+    // Authority-only: no userinfo, path (beyond "/"), query, or fragment.
+    if (parsed.username || parsed.password) return false;
+    if (parsed.pathname !== "/") return false;
+    if (parsed.search || parsed.hash) return false;
+    if (!parsed.hostname) return false;
+
+    // Port must be empty or an integer in 1–65535 (URL parser already validates syntax).
+    if (parsed.port) {
+      const port = Number(parsed.port);
+      if (!Number.isInteger(port) || port < 1 || port > 65535) return false;
+    }
+
+    // Ensure round-trip preserves the Host form we will embed (incl. [ipv6]:port).
+    const authority = parsed.host; // hostname[:port], brackets for IPv6
+    return authority === host;
+  } catch {
+    return false;
+  }
 }
 
 /**
