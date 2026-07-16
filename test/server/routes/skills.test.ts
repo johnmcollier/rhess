@@ -94,7 +94,7 @@ describe("GET /api/v1/skills", () => {
     expect(body.data[0]).toHaveProperty("allowedTools");
   });
 
-  it("installCommand targets the well-known host with --skill filter", async () => {
+  it("installCommand targets the per-skill discovery URL", async () => {
     const res = await app.inject({
       method: "GET",
       url: "/api/v1/skills",
@@ -103,7 +103,7 @@ describe("GET /api/v1/skills", () => {
     expect(res.statusCode).toBe(200);
     const skill = res.json().data.find((s: { slug: string }) => s.slug === "react-patterns");
     expect(skill.installCommand).toBe(
-      "npx skills add http://localhost:3000 --skill=react-patterns",
+      "npx skills add http://localhost:3000/api/v1/skills/team-a/react-patterns",
     );
   });
 
@@ -116,8 +116,28 @@ describe("GET /api/v1/skills", () => {
     expect(res.statusCode).toBe(200);
     for (const skill of res.json().data) {
       expect(skill.installCommand).not.toContain("attacker.test");
-      expect(skill.installCommand).toMatch(/^npx skills add http:\/\/localhost --skill=/);
+      expect(skill.installCommand).toMatch(
+        /^npx skills add http:\/\/localhost\/api\/v1\/skills\//,
+      );
     }
+  });
+
+  it("serves a single-entry well-known index under the skill path", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/v1/skills/team-a/react-patterns/.well-known/agent-skills/index.json",
+      headers: { host: "localhost:3000" },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.$schema).toBe("https://schemas.agentskills.io/discovery/0.2.0/schema.json");
+    expect(body.skills).toHaveLength(1);
+    expect(body.skills[0]).toMatchObject({
+      name: "react-patterns",
+      type: "skill-md",
+      url: "http://localhost:3000/api/v1/skills/team-a/react-patterns/artifact",
+    });
+    expect(body.skills[0].digest).toMatch(/^sha256:/);
   });
 
   it("paginates correctly", async () => {

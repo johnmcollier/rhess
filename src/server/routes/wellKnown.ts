@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import type { SkillRepository } from "../db/types.js";
 import { resolveBaseUrl } from "../utils/resolveBaseUrl.js";
-import { isValidSkillInstallId } from "../utils/skillInstallId.js";
+import { buildDiscoveryIndex } from "../utils/discoveryIndex.js";
 
 interface WellKnownOptions {
   skills: SkillRepository;
@@ -42,26 +42,7 @@ const wellKnownPlugin: FastifyPluginAsync<WellKnownOptions> = async (fastify, op
     },
   }, async (req: FastifyRequest, reply) => {
     const baseUrl = resolveBaseUrl(req);
-    const entries = opts.skills.findAllDiscoveryEntries();
-    return reply.send({
-      // Opaque schema URI required by the Agent Skills discovery RFC / npx skills CLI.
-      // Clients match this exactly; a different v0.2.0-looking URI is rejected.
-      $schema: "https://schemas.agentskills.io/discovery/0.2.0/schema.json",
-      skills: entries
-        .filter((s) => isValidSkillInstallId(s.slug))
-        .map((s) => ({
-          // Discovery `name` must be a kebab-case install id ([a-z0-9-]+). Prefer slug
-          // over frontmatter display names that may contain spaces or mixed case.
-          name: s.slug,
-          type: s.artifactType,
-          // CLI rejects descriptions longer than 1024 characters.
-          description: s.description.length > 1024
-            ? `${s.description.slice(0, 1023)}…`
-            : s.description,
-          url: `${baseUrl}/api/v1/skills/${encodeURIComponent(s.sourceSlug)}/${encodeURIComponent(s.slug)}/artifact`,
-          digest: `sha256:${s.digest}`,
-        })),
-    });
+    return reply.send(buildDiscoveryIndex(opts.skills.findAllDiscoveryEntries(), baseUrl));
   });
 };
 

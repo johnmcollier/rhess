@@ -57,7 +57,7 @@ List all indexed skills (paginated).
       "allowedTools": [],
       "skillPath": "skills/agent-ready/SKILL.md",
       "frontmatter": {},
-      "installCommand": "npx skills add http://localhost:3000 --skill agent-ready",
+      "installCommand": "npx skills add http://localhost:3000/api/v1/skills/rhdh-skills/agent-ready",
       "lastModified": "2026-06-19T14:32:00Z"
     }
   ],
@@ -133,7 +133,7 @@ Full skill detail including all files.
   "allowedTools": [],
   "skillPath": "skills/agent-ready/SKILL.md",
   "frontmatter": { "version": "1.0" },
-  "installCommand": "npx skills add http://localhost:3000 --skill agent-ready",
+  "installCommand": "npx skills add http://localhost:3000/api/v1/skills/rhdh-skills/agent-ready",
   "lastModified": "2026-06-19T14:32:00Z",
   "content": "---\nname: agent-ready\n…",
   "files": [
@@ -155,7 +155,7 @@ Download the raw skill artifact.
 - Returns `text/markdown` for `skill-md` type.
 - Returns `application/gzip` (tar.gz) for `archive` type.
 
-This is the URL referenced in the Agent Skills discovery index (`url` field). Install via the host + `--skill` form in `installCommand`, not this artifact URL directly.
+This is the URL referenced in the Agent Skills discovery index (`url` field). Install via the per-skill discovery URL in `installCommand` (`npx skills add …/api/v1/skills/:source/:slug`), not this artifact URL directly.
 
 **Response `404`** — skill not found.
 

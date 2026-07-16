@@ -9,6 +9,7 @@ import type { Repositories } from "../db/init.js";
 import { createAdminAuthHook } from "../plugins/adminAuth.js";
 import { ingestSource } from "../ingestion/ingest.js";
 import { resolveBaseUrl } from "../utils/resolveBaseUrl.js";
+import { buildDiscoveryIndex, toDiscoverySkillEntry } from "../utils/discoveryIndex.js";
 
 /**
  * Decode a base64 tar.gz archive and return all contained files as
@@ -50,11 +51,12 @@ async function expandArchiveToFiles(
 }
 
 function skillToResponse(skill: Skill, source: Source | undefined, baseUrl: string) {
-  // Point at the host so the CLI discovers via /.well-known/agent-skills/index.json,
-  // then select this skill. Artifact URLs are not a valid skills-add source by themselves
-  // and would make the CLI fetch every skill in the index.
-  // Use --skill=<id> (single argv token) so odd slug characters cannot split the command.
-  const installCommand = `npx skills add ${baseUrl} --skill=${skill.slug}`;
+  // Point at the per-skill discovery URL. The CLI looks for
+  // <url>/.well-known/agent-skills/index.json first; that single-entry index
+  // auto-selects this skill. Host root + `--skill=…` fails because the skills CLI
+  // does not parse the equals form of --skill, and would download the full catalog.
+  const installCommand =
+    `npx skills add ${baseUrl}/api/v1/skills/${encodeURIComponent(skill.sourceSlug)}/${encodeURIComponent(skill.slug)}`;
   return {
     id: skill.id,
     source: skill.sourceSlug,
@@ -117,7 +119,8 @@ const skillSchema = {
     frontmatter: { type: "object", additionalProperties: true, description: "Full parsed frontmatter map (excluding name/description)" },
     installCommand: {
       type: "string",
-      description: "npx skills add <host> --skill <slug> command to install this skill via well-known discovery",
+      description:
+        "npx skills add <skill-discovery-url> command; the URL serves a single-entry well-known index",
     },
     lastModified: { type: "string", description: "ISO 8601 timestamp of last update" },
   },
@@ -266,6 +269,83 @@ const skillsPlugin: FastifyPluginAsync<SkillsRouteOptions> = async (fastify, opt
         data: data.map((s) => skillToResponse(s, sourceMap.get(s.sourceSlug), baseUrl)),
         meta: { total, page: rawPage, per_page: rawPerPage, total_pages, sort: rawSort },
       });
+    }
+  );
+
+  // Per-skill discovery index — registered before /:source/:slug.
+  // Consumed by `npx skills add <base>/api/v1/skills/:source/:slug`, which probes
+  // `<url>/.well-known/agent-skills/index.json` before falling back to the host root.
+  fastify.get(
+    "/:source/:slug/.well-known/agent-skills/index.json",
+    {
+      schema: {
+        tags: ["Discovery"],
+        summary: "Single-skill Agent Skills discovery index",
+        description:
+          "Returns a one-entry discovery manifest for this skill so `npx skills add` " +
+          "can install it without downloading the full catalog.",
+        params: {
+          type: "object",
+          required: ["source", "slug"],
+          properties: {
+            source: { type: "string" },
+            slug: { type: "string" },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              $schema: { type: "string" },
+              skills: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    type: { type: "string", enum: ["skill-md", "archive"] },
+                    description: { type: "string" },
+                    url: { type: "string", format: "uri" },
+                    digest: { type: "string" },
+                  },
+                  required: ["name", "type", "description", "url", "digest"],
+                },
+              },
+            },
+          },
+          404: errorSchema,
+        },
+      },
+    },
+    async (
+      req: FastifyRequest<{ Params: { source: string; slug: string } }>,
+      reply: FastifyReply
+    ) => {
+      const { source, slug } = req.params;
+      const skill = skills.findBySourceAndSlug(source, slug);
+      if (!skill) {
+        return reply.code(404).send({
+          error: { code: "SKILL_NOT_FOUND", message: `Skill '${source}/${slug}' not found.` },
+        });
+      }
+      const baseUrl = resolveBaseUrl(req);
+      const discoverySkill = {
+        sourceSlug: skill.sourceSlug,
+        slug: skill.slug,
+        name: skill.name,
+        description: skill.description,
+        artifactType: skill.artifactType,
+        digest: skill.digest,
+      };
+      if (!toDiscoverySkillEntry(discoverySkill, baseUrl)) {
+        return reply.code(404).send({
+          error: {
+            code: "SKILL_NOT_INSTALLABLE",
+            message: `Skill '${source}/${slug}' has an install id that is incompatible with npx skills.`,
+          },
+        });
+      }
+      return reply.send(buildDiscoveryIndex([discoverySkill], baseUrl));
     }
   );
 
