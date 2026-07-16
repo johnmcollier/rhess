@@ -4,6 +4,7 @@ import path from "node:path";
 import { clone, discoverSkills, parseFrontmatter, bundleSkill } from "./index.js";
 import type { Repositories } from "../db/init.js";
 import type { UpsertSkillInput } from "../db/types.js";
+import { isValidSkillInstallId } from "../utils/skillInstallId.js";
 
 export interface SkillIndexEntry {
   slug: string;
@@ -48,6 +49,16 @@ export async function ingestFromClonedPath(
   for (const candidate of candidates) {
     const relativePath = path.relative(repoPath, candidate.skillMdPath);
     try {
+      if (!isValidSkillInstallId(candidate.slug)) {
+        failures.push({
+          path: relativePath,
+          reason:
+            `Invalid skill install id '${candidate.slug}': must be 1–64 lowercase ` +
+            "kebab-case characters ([a-z0-9]+(?:-[a-z0-9]+)*) for npx skills CLI compatibility",
+        });
+        continue;
+      }
+
       const bundleResult = await bundleSkill(candidate);
 
       // For skill-md, the artifact IS the raw SKILL.md content — reuse it to

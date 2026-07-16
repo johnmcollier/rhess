@@ -36,6 +36,10 @@ spec:
               value: /data/rhess.db
             - name: PORT
               value: "3000"
+            # Public origin used in /.well-known artifact URLs and installCommand.
+            # Must be the external https:// route URL when TLS terminates at the ingress.
+            # - name: PUBLIC_BASE_URL
+            #   value: https://rhess.example.com
           volumeMounts:
             - name: data
               mountPath: /data

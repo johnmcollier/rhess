@@ -120,6 +120,29 @@ describe("ingestFromClonedPath", () => {
     expect(slugs).toContain("beta-skill");
   });
 
+  it("rejects directory names that are not CLI-compatible install ids", async () => {
+    tmpDir = makeTmpDir();
+    await initRepo(tmpDir);
+
+    writeSkill(tmpDir, "skills", "alpha-skill", VALID_SKILL_A);
+    writeSkill(tmpDir, "skills", "Bad Skill Name", VALID_SKILL_B);
+    writeSkill(tmpDir, "skills", "has_underscore", VALID_SKILL_C);
+    await commitAll(tmpDir);
+
+    const repos = makeRepos();
+    const source = repos.sources.create({ slug: "test-source", label: "test-source", url: "file:///test" });
+    const report = await ingestFromClonedPath(source.id, source.slug, tmpDir, repos);
+
+    expect(report.discovered).toBe(3);
+    expect(report.indexed).toBe(1);
+    expect(report.failed).toBe(2);
+    expect(report.failures.every((f) => /install id/i.test(f.reason))).toBe(true);
+
+    const allSkills = repos.skills.findAll({ perPage: 100 });
+    expect(allSkills).toHaveLength(1);
+    expect(allSkills[0]!.slug).toBe("alpha-skill");
+  });
+
   it("scenario 2: malformed frontmatter → skipped + reported", async () => {
     tmpDir = makeTmpDir();
     await initRepo(tmpDir);
