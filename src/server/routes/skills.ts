@@ -61,7 +61,10 @@ function resolveBaseUrl(req: FastifyRequest): string {
 }
 
 function skillToResponse(skill: Skill, source: Source | undefined, baseUrl: string) {
-  const installCommand = `npx skills add ${baseUrl}/api/v1/skills/${encodeURIComponent(skill.sourceSlug)}/${encodeURIComponent(skill.slug)}/artifact`;
+  // Point at the host so the CLI discovers via /.well-known/agent-skills/index.json,
+  // then select this skill. Artifact URLs are not a valid skills-add source by themselves
+  // and would make the CLI fetch every skill in the index.
+  const installCommand = `npx skills add ${baseUrl} --skill ${skill.slug}`;
   return {
     id: skill.id,
     source: skill.sourceSlug,
@@ -122,7 +125,10 @@ const skillSchema = {
     allowedTools: { type: "array", items: { type: "string" }, description: "Tools the skill is allowed to use" },
     skillPath: { type: "string", description: "Relative path to SKILL.md within the source repository" },
     frontmatter: { type: "object", additionalProperties: true, description: "Full parsed frontmatter map (excluding name/description)" },
-    installCommand: { type: "string", description: "npx skills add … command to install this skill" },
+    installCommand: {
+      type: "string",
+      description: "npx skills add <host> --skill <slug> command to install this skill via well-known discovery",
+    },
     lastModified: { type: "string", description: "ISO 8601 timestamp of last update" },
   },
   required: ["id", "source", "slug", "name", "description", "artifactType", "digest", "allowedTools", "skillPath", "installCommand", "lastModified"],
